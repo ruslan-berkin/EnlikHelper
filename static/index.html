@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Maintenance Copilot</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">Мониторинг оборудования</p>
+      <h1>Maintenance Copilot</h1>
+    </div>
+
+    <div class="status">
+      <span class="status-dot"></span>
+      Система работает
+    </div>
+  </header>
+
+  <main>
+    <section class="upload-panel">
+      <div>
+        <h2>Загрузка измерений</h2>
+        <p>CSV должен содержать время, ID оборудования, температуру, вибрацию и RPM.</p>
+      </div>
+
+      <form id="upload-form">
+        <input id="csv-file" name="file" type="file" accept=".csv,text/csv" required>
+        <button type="submit">Загрузить CSV</button>
+      </form>
+
+      <p id="upload-message" class="message" aria-live="polite"></p>
+    </section>
+
+    <section class="summary">
+      <article>
+        <span>Оборудование</span>
+        <strong id="equipment-count">—</strong>
+      </article>
+      <section>
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">AI-агент</p>
+            <h2>Заявки на обслуживание</h2>
+          </div>
+        </div>
+
+        <div id="tickets-list" class="tickets-list"></div>
+      </section>
+
+      <article>
+        <span>Предупреждения</span>
+        <strong id="alerts-count">—</strong>
+      </article>
+    </section>
+    <article>
+      <span>Заявки</span>
+      <strong id="tickets-count">—</strong>
+    </article>
+
+    <section>
+      <div class="section-heading">
+        <h2>Состояние оборудования</h2>
+        <button id="refresh-button" class="secondary" type="button">
+          Обновить
+        </button>
+      </div>
+
+      <div id="equipment-grid" class="equipment-grid"></div>
+    </section>
+
+    <section class="ai-panel">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">OpenAI</p>
+          <h2>AI-отчёт</h2>
+        </div>
+
+        <button id="ai-report-button" type="button">
+          Сформировать AI-отчёт
+        </button>
+      </div>
+
+      <p class="ai-note">
+        OpenAI создаёт структурированный отчёт, после чего NVIDIA NeMo Guardrails
+        проверяет его безопасность. Выполняются два обращения к AI-модели.
+        Отчёт не является диагнозом оборудования.
+      </p>
+
+      <div id="ai-report" class="ai-report">
+        <div class="empty">
+          Нажмите кнопку, чтобы получить объяснение результатов.
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Предупреждения</h2>
+      <div id="alerts-list" class="alerts-list"></div>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+
+</html>
