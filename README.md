@@ -27,6 +27,8 @@ Current tools:
 - `search-manual <equipment_id> <query>` — retrieve relevant manual fragments
   with filename and page citations;
 - `list-manuals [equipment_id]` — list indexed manuals.
+- `set-profile <equipment_id> --manufacturer ... --model ... --serial ...` —
+  attach the known equipment identity to the measurements and manuals.
 
 ## Architecture
 
@@ -69,6 +71,8 @@ generated analytical reports before they are shown in the dashboard.
 - AI output is an operational aid, not an equipment diagnosis.
 - Manual guidance is grounded in retrieved PDF fragments and includes the
   filename and page number.
+- A manual is treated as general guidance until the equipment manufacturer and
+  model are recorded in its profile.
 
 ## Local setup
 
@@ -110,6 +114,7 @@ python agent_tools.py approve-ticket 1
 python agent_tools.py index-manual MOTOR-01 manual.pdf
 python agent_tools.py search-manual MOTOR-01 "Что проверить при вибрации?"
 python agent_tools.py list-manuals MOTOR-01
+python agent_tools.py set-profile MOTOR-01 --manufacturer ABB --model "M2B" --serial "SERIAL-001"
 ```
 
 ## Verification

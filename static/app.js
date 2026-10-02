@@ -15,6 +15,13 @@ const manualUploadMessage = document.querySelector("#manual-upload-message");
 const manualSearchForm = document.querySelector("#manual-search-form");
 const manualsList = document.querySelector("#manuals-list");
 const manualResults = document.querySelector("#manual-results");
+const profileForm = document.querySelector("#profile-form");
+const profileEquipment = document.querySelector("#profile-equipment");
+const profileManufacturer = document.querySelector("#profile-manufacturer");
+const profileModel = document.querySelector("#profile-model");
+const profileSerial = document.querySelector("#profile-serial");
+const profileMessage = document.querySelector("#profile-message");
+let equipmentItems = [];
 
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (character) => ({
@@ -83,6 +90,7 @@ function renderEquipment(items) {
   equipmentGrid.innerHTML = items.map((item) => `
     <article class="equipment-card">
       <h3>${escapeHtml(item.equipment_id)}</h3>
+      <p class="equipment-profile">${escapeHtml(formatProfile(item.profile))}</p>
 
       <div class="metrics">
         <div class="metric">
@@ -107,6 +115,28 @@ function renderEquipment(items) {
       </div>
     </article>
   `).join("");
+}
+
+function formatProfile(profile) {
+  if (!profile || (!profile.manufacturer && !profile.model && !profile.serial_number)) {
+    return "Модель не указана — инструкция считается общей";
+  }
+  return [profile.manufacturer, profile.model, profile.serial_number]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+function syncProfileForm(items) {
+  const previous = profileEquipment.value;
+  profileEquipment.innerHTML = items.map((item) => `
+    <option value="${escapeHtml(item.equipment_id)}">${escapeHtml(item.equipment_id)}</option>
+  `).join("");
+  if (items.some((item) => item.equipment_id === previous)) profileEquipment.value = previous;
+  const selected = items.find((item) => item.equipment_id === profileEquipment.value);
+  const profile = selected?.profile || {};
+  profileManufacturer.value = profile.manufacturer || "";
+  profileModel.value = profile.model || "";
+  profileSerial.value = profile.serial_number || "";
 }
 
 function renderAlerts(items) {
@@ -258,6 +288,7 @@ async function loadReport() {
     }
 
     const report = await response.json();
+    equipmentItems = report.equipment;
 
     equipmentCount.textContent = report.equipment_count;
     alertsCount.textContent = report.alerts_count;
@@ -266,6 +297,7 @@ async function loadReport() {
     renderEquipment(report.equipment);
     renderAlerts(report.alerts);
     renderTickets(report.tickets);
+    syncProfileForm(report.equipment);
 
     const previousEquipment = manualEquipment.value;
     manualEquipment.innerHTML = report.equipment.map((item) => `
@@ -322,6 +354,38 @@ aiReportButton.addEventListener("click", async () => {
   } finally {
     aiReportButton.disabled = false;
     aiReportButton.textContent = "Сформировать AI-отчёт";
+  }
+});
+
+profileEquipment.addEventListener("change", () => {
+  syncProfileForm(equipmentItems);
+});
+
+profileForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  profileMessage.className = "message";
+  profileMessage.textContent = "Сохраняем профиль…";
+  try {
+    const response = await fetch(
+      `/api/equipment/${encodeURIComponent(profileEquipment.value)}/profile`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          manufacturer: profileManufacturer.value,
+          model: profileModel.value,
+          serial_number: profileSerial.value,
+        }),
+      },
+    );
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.detail || "Не удалось сохранить профиль");
+    profileMessage.className = "message success";
+    profileMessage.textContent = "Профиль сохранён.";
+    await loadReport();
+  } catch (error) {
+    profileMessage.className = "message error";
+    profileMessage.textContent = error.message;
   }
 });
 

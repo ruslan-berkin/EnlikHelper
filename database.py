@@ -45,6 +45,14 @@ def save_readings(readings: list[dict]) -> int:
 
             connection.execute(
                 """
+                INSERT OR IGNORE INTO equipment_profiles (equipment_id)
+                VALUES (?)
+                """,
+                (equipment_id,),
+            )
+
+            connection.execute(
+                """
                 INSERT OR IGNORE INTO equipment_thresholds (
                     equipment_id,
                     max_temperature_c,
@@ -79,6 +87,66 @@ def save_readings(readings: list[dict]) -> int:
             inserted_count += cursor.rowcount
 
     return inserted_count
+
+
+def get_equipment_profile(equipment_id: str) -> dict | None:
+    with connect() as connection:
+        row = connection.execute(
+            """
+            SELECT equipment_id, manufacturer, model, serial_number, updated_at
+            FROM equipment_profiles
+            WHERE equipment_id = ?
+            """,
+            (equipment_id,),
+        ).fetchone()
+
+    return dict(row) if row is not None else None
+
+
+def set_equipment_profile(
+    equipment_id: str,
+    manufacturer: str | None,
+    model: str | None,
+    serial_number: str | None,
+) -> dict:
+    values = {
+        "manufacturer": manufacturer.strip() if manufacturer else None,
+        "model": model.strip() if model else None,
+        "serial_number": serial_number.strip() if serial_number else None,
+    }
+
+    with connect() as connection:
+        exists = connection.execute(
+            "SELECT 1 FROM equipment WHERE equipment_id = ?",
+            (equipment_id,),
+        ).fetchone()
+        if exists is None:
+            raise ValueError(f"Оборудование не найдено: {equipment_id}")
+
+        connection.execute(
+            """
+            INSERT INTO equipment_profiles (
+                equipment_id, manufacturer, model, serial_number
+            )
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT (equipment_id) DO UPDATE SET
+                manufacturer = excluded.manufacturer,
+                model = excluded.model,
+                serial_number = excluded.serial_number,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (
+                equipment_id,
+                values["manufacturer"],
+                values["model"],
+                values["serial_number"],
+            ),
+        )
+
+    return get_equipment_profile(equipment_id) or {
+        "equipment_id": equipment_id,
+        **values,
+    }
 
 
 def count_readings() -> int:

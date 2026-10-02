@@ -6,6 +6,22 @@ CREATE TABLE IF NOT EXISTS equipment (
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS equipment_profiles (
+    equipment_id TEXT PRIMARY KEY,
+    manufacturer TEXT,
+    model TEXT,
+    serial_number TEXT,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (equipment_id)
+        REFERENCES equipment(equipment_id)
+        ON DELETE CASCADE
+);
+
+INSERT OR IGNORE INTO equipment_profiles (equipment_id)
+SELECT equipment_id
+FROM equipment;
+
 CREATE TABLE IF NOT EXISTS equipment_thresholds (
     equipment_id TEXT PRIMARY KEY,
     max_temperature_c REAL NOT NULL

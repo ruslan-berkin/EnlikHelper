@@ -8,10 +8,12 @@ from agent_tools import create_ticket_draft, get_equipment_snapshot
 from database import (
     approve_maintenance_ticket,
     get_manual_chunks,
+    get_equipment_profile,
     initialize_database,
     list_manual_documents,
     save_manual_document,
     save_readings,
+    set_equipment_profile,
     set_equipment_thresholds,
 )
 from knowledge_service import (
@@ -60,6 +62,18 @@ class AgentToolsTestCase(unittest.TestCase):
         self.assertEqual(snapshot["status"], "attention")
         self.assertEqual(snapshot["summary"]["readings_count"], 2)
         self.assertEqual(len(snapshot["latest_alerts"]), 1)
+        self.assertEqual(snapshot["profile"]["equipment_id"], "MOTOR-TEST")
+
+    def test_equipment_profile_is_saved_and_returned(self) -> None:
+        profile = set_equipment_profile(
+            "MOTOR-TEST", "ABB", "M2B", "SERIAL-001"
+        )
+        self.assertEqual(profile["manufacturer"], "ABB")
+        self.assertEqual(profile["model"], "M2B")
+        self.assertEqual(
+            get_equipment_profile("MOTOR-TEST")["serial_number"],
+            "SERIAL-001",
+        )
 
     def test_ticket_workflow_is_idempotent(self) -> None:
         first_result = create_ticket_draft("MOTOR-TEST")

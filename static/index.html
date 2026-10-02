@@ -64,6 +64,27 @@
       <div id="equipment-grid" class="equipment-grid"></div>
     </section>
 
+    <section class="profile-panel">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Паспорт оборудования</p>
+          <h2>Модель и инструкция</h2>
+        </div>
+      </div>
+      <p class="manual-note">
+        Укажите модель, чтобы связывать инструкции с конкретным двигателем.
+        Пока модель не указана, найденные процедуры считаются общими.
+      </p>
+      <form id="profile-form" class="profile-form">
+        <label>Оборудование<select id="profile-equipment" required></select></label>
+        <label>Производитель<input id="profile-manufacturer" type="text"></label>
+        <label>Модель<input id="profile-model" type="text"></label>
+        <label>Серийный номер<input id="profile-serial" type="text"></label>
+        <button type="submit">Сохранить профиль</button>
+      </form>
+      <p id="profile-message" class="message" aria-live="polite"></p>
+    </section>
+
     <section class="ai-panel">
       <div class="section-heading">
         <div>

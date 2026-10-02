@@ -9,11 +9,13 @@ from pydantic import BaseModel
 from database import (
     count_readings,
     get_alert_readings,
+    get_equipment_profile,
     get_equipment_summaries,
     initialize_database,
     list_manual_documents,
     list_maintenance_tickets,
     save_readings,
+    set_equipment_profile,
 )
 from knowledge_service import (
     ManualKnowledgeUnavailable,
@@ -48,6 +50,12 @@ class ManualSearchRequest(BaseModel):
     query: str
 
 
+class EquipmentProfileRequest(BaseModel):
+    manufacturer: str | None = None
+    model: str | None = None
+    serial_number: str | None = None
+
+
 @app.get("/", include_in_schema=False)
 def dashboard():
     return FileResponse(STATIC_DIR / "index.html")
@@ -68,6 +76,9 @@ def report() -> dict:
     alerts = find_alerts(alert_readings)
     tickets = list_maintenance_tickets()
 
+    for item in equipment:
+        item["profile"] = get_equipment_profile(item["equipment_id"])
+
     return {
         "equipment": equipment,
         "alerts": alerts,
@@ -76,6 +87,22 @@ def report() -> dict:
         "tickets": tickets,
         "tickets_count": len(tickets),
     }
+
+
+@app.put("/api/equipment/{equipment_id}/profile")
+def update_equipment_profile(
+    equipment_id: str,
+    request: EquipmentProfileRequest,
+) -> dict:
+    try:
+        return set_equipment_profile(
+            equipment_id=equipment_id,
+            manufacturer=request.manufacturer,
+            model=request.model,
+            serial_number=request.serial_number,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
 
 @app.post("/api/readings/import")
 async def import_readings(

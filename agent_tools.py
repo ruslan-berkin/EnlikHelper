@@ -7,9 +7,11 @@ from database import (
     create_maintenance_ticket_draft,
     get_alert_readings,
     get_equipment_summaries,
+    get_equipment_profile,
     initialize_database,
     list_manual_documents,
     list_maintenance_tickets,
+    set_equipment_profile,
 )
 from knowledge_service import (
     ManualKnowledgeUnavailable,
@@ -46,6 +48,7 @@ def get_equipment_snapshot(equipment_id: str) -> dict:
 
     return {
         "equipment_id": equipment_id,
+        "profile": get_equipment_profile(equipment_id),
         "status": summary["status"],
         "thresholds": {
             "max_temperature_c": summary["max_temperature_c"],
@@ -159,6 +162,15 @@ def create_parser() -> argparse.ArgumentParser:
         help="Показать заявки на обслуживание",
     )
 
+    profile_command = commands.add_parser(
+        "set-profile",
+        help="Сохранить паспортный профиль оборудования",
+    )
+    profile_command.add_argument("equipment_id")
+    profile_command.add_argument("--manufacturer", default=None)
+    profile_command.add_argument("--model", default=None)
+    profile_command.add_argument("--serial", dest="serial_number", default=None)
+
     index_manual_command = commands.add_parser(
         "index-manual",
         help="Проиндексировать PDF-инструкцию",
@@ -226,6 +238,14 @@ def main() -> None:
             result = {
                 "tickets": list_maintenance_tickets()
             }
+
+        elif arguments.command == "set-profile":
+            result = set_equipment_profile(
+                equipment_id=arguments.equipment_id,
+                manufacturer=arguments.manufacturer,
+                model=arguments.model,
+                serial_number=arguments.serial_number,
+            )
 
         elif arguments.command == "index-manual":
             if arguments.file.suffix.lower() != ".pdf":
