@@ -1,94 +1,83 @@
 # EnlikHelper
 
-EnlikHelper is an industrial maintenance agent that turns sensor
-readings into traceable maintenance actions. It combines deterministic Python
-and SQL calculations with an OpenAI-powered agent running in an NVIDIA
-NemoClaw sandbox.
+EnlikHelper — локальный AI-помощник для первичной проверки состояния промышленного оборудования.
+Проект принимает показания датчиков, рассчитывает отклонения от заданных порогов,
+объясняет результат на русском языке и помогает оформить черновик заявки на обслуживание.
 
-The agent can inspect equipment state, explain threshold violations, create a
-maintenance-ticket draft, avoid duplicate tickets, approve a draft only after
-an explicit user request, and retrieve relevant procedures from indexed PDF
-manuals with page citations.
+Вычисления выполняются детерминированным Python/SQL-кодом. OpenAI используется для
+понимания запроса, формирования объяснения и семантического поиска по руководствам.
+NVIDIA NemoClaw предоставляет изолированный runtime для агента, а NeMo Guardrails
+проверяет ограничения AI-отчётов перед показом пользователю.
 
-## Why this is an agent
+## Возможности
 
-The language model does not calculate measurements or edit the database
-directly. It selects a registered tool from the user's request. The Python
-tools validate the action, calculate the result, and persist it in SQLite.
+- импорт показаний оборудования из CSV;
+- сводка по температуре, вибрации, RPM и количеству измерений;
+- проверка порогов и предупреждений для каждого оборудования;
+- профиль оборудования: производитель, модель и серийный номер;
+- индексация PDF-руководств и поиск фрагментов с указанием страницы;
+- AI-отчёт с фактами, рекомендациями и явными ограничениями оценки;
+- создание идемпотентного черновика заявки на обслуживание;
+- локальное одобрение заявки после явного действия пользователя;
+- веб-интерфейс FastAPI и OpenAPI-документация;
+- агент OpenClaw/NemoClaw с зарегистрированными read-only и action-инструментами.
 
-Current tools:
-
-- `snapshot <equipment_id>` — read the verified equipment state;
-- `create-ticket-draft <equipment_id>` — create an idempotent draft from the
-  latest alert;
-- `list-tickets` — list maintenance tickets;
-- `approve-ticket <ticket_id>` — approve a draft after explicit confirmation.
-- `index-manual <equipment_id> <file.pdf>` — extract and index a PDF manual;
-- `search-manual <equipment_id> <query>` — retrieve relevant manual fragments
-  with filename and page citations;
-- `list-manuals [equipment_id]` — list indexed manuals.
-- `set-profile <equipment_id> --manufacturer ... --model ... --serial ...` —
-  attach the known equipment identity to the measurements and manuals.
-
-## Architecture
+## Принцип работы
 
 ```text
-CSV sensor readings
+CSV с показаниями
         |
         v
-Python validation and calculations
+Python: валидация и расчёты
         |
         v
-SQLite: equipment, thresholds, readings, tickets, manual chunks
+SQLite: оборудование, пороги, измерения, заявки, фрагменты PDF
         |
-        +--------------------+
-        |                    |
-        v                    v
-FastAPI dashboard      NVIDIA NemoClaw sandbox
-                             |
-                             v
-                       OpenAI agent model
-                             |
-                             v
-                    Registered Python tools
+        +-------------------------+
+        |                         |
+        v                         v
+FastAPI и веб-интерфейс     AI-слой OpenAI
+                                  |
+                                  v
+                         NemoClaw / OpenClaw
+                                  |
+                                  v
+                         зарегистрированные tools
 ```
 
-OpenAI handles intent recognition, tool selection, user-facing explanations,
-and embeddings for semantic search over equipment manuals. NVIDIA NemoClaw
-provides the isolated, always-on agent runtime. NVIDIA NeMo Guardrails checks
-generated analytical reports before they are shown in the dashboard.
+Границы ответственности намеренно разделены:
 
-## Safety and traceability
+- Python и SQL являются источником числовых фактов и статусов;
+- OpenAI выбирает инструмент и формулирует ответ на основе возвращённых данных;
+- NemoClaw изолирует выполнение агентских действий;
+- Guardrails не позволяет выдавать отчёт за диагноз или придумывать причины неисправности;
+- одобрение заявки меняет только локальную базу и ничего не отправляет во внешнюю CMMS/ERP.
 
-- Equipment status is calculated in SQL from stored readings and configured
-  thresholds.
-- Ticket evidence stores the exact thresholds, summary, and alert used to
-  create the ticket.
-- Repeating the same action does not create duplicate tickets.
-- A status check never creates or approves a ticket.
-- Approval changes only the local ticket status and does not send anything to
-  an external maintenance system.
-- AI output is an operational aid, not an equipment diagnosis.
-- Manual guidance is grounded in retrieved PDF fragments and includes the
-  filename and page number.
-- A manual is treated as general guidance until the equipment manufacturer and
-  model are recorded in its profile.
+## Быстрый запуск
 
-## Local setup
-
-Requires Python 3.12 or later.
+Требуется Python 3.12 или новее.
 
 ```bash
+git clone https://github.com/ruslan-berkin/EnlikHelper.git
+cd EnlikHelper
+
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Add an OpenAI API key to `.env` to use AI reports and manual search. Never
-commit the `.env` file.
+Для AI-функций добавьте ключ в `.env`:
 
-Import the sample data and configure the second motor:
+```env
+OPENAI_API_KEY=...
+OPENAI_MODEL=gpt-6-luna
+OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+```
+
+Файл `.env` не должен попадать в Git.
+
+Загрузите демонстрационные данные:
 
 ```bash
 python main.py import data/motor_readings.csv
@@ -96,44 +85,126 @@ python main.py import data/motor_02_readings.csv
 python main.py thresholds MOTOR-02 --temperature 60 --vibration 5
 ```
 
-Start the dashboard:
+Запустите веб-приложение:
 
 ```bash
-python -m uvicorn web_app:app --reload
+python -m uvicorn web_app:app --reload --host 127.0.0.1 --port 8765
 ```
 
-Open <http://127.0.0.1:8000>.
+Откройте [http://127.0.0.1:8765](http://127.0.0.1:8765). Интерактивная документация API
+доступна по адресу [http://127.0.0.1:8765/docs](http://127.0.0.1:8765/docs).
 
-## Agent tool examples
+## CLI агента
+
+Все команды ниже работают из корня проекта:
 
 ```bash
+# Проверенное состояние оборудования
 python agent_tools.py snapshot MOTOR-01
+
+# Профиль оборудования
+python agent_tools.py set-profile MOTOR-01 \
+  --manufacturer ABB \
+  --model "M2BAX 90SA 4" \
+  --serial "SERIAL-001"
+
+# Черновик заявки и его статус
 python agent_tools.py create-ticket-draft MOTOR-01
 python agent_tools.py list-tickets
 python agent_tools.py approve-ticket 1
+
+# Поиск по руководству
 python agent_tools.py index-manual MOTOR-01 manual.pdf
 python agent_tools.py search-manual MOTOR-01 "Что проверить при вибрации?"
 python agent_tools.py list-manuals MOTOR-01
-python agent_tools.py set-profile MOTOR-01 --manufacturer ABB --model "M2BAX 90SA 4" --serial "DEMO-3GBA092110-ADT"
 ```
 
-## Verification
+Команда `snapshot` не изменяет базу. Повторное создание одинакового черновика
+возвращает уже существующую заявку и не создаёт дубликат.
 
-Run the deterministic agent workflow tests:
+## HTTP API
+
+| Метод | Endpoint | Назначение |
+| --- | --- | --- |
+| `GET` | `/api/health` | Проверка доступности сервиса |
+| `GET` | `/api/report` | Сводный отчёт по оборудованию |
+| `POST` | `/api/readings/import` | Импорт CSV-файла |
+| `PUT` | `/api/equipment/{equipment_id}/profile` | Обновление профиля оборудования |
+| `POST` | `/api/ai-report` | AI-отчёт по текущим данным |
+| `GET` | `/api/manuals` | Список загруженных руководств |
+| `POST` | `/api/manuals/{equipment_id}/import` | Индексация PDF |
+| `POST` | `/api/manuals/{equipment_id}/search` | Семантический поиск по PDF |
+
+## Формат CSV
+
+Используется строковый идентификатор оборудования и временная метка измерения:
+
+```csv
+timestamp,equipment_id,temperature_c,vibration_mm_s,rpm
+2026-10-01 09:00:00,MOTOR-01,64.2,2.8,1500
+2026-10-01 09:15:00,MOTOR-01,69.8,4.9,1503
+```
+
+Неверные строки отклоняются с понятным сообщением, а повторный импорт тех же
+измерений не создаёт дубликаты в SQLite.
+
+## Работа с руководствами
+
+PDF загружается отдельно для конкретного оборудования. Текст разбивается на фрагменты,
+для каждого фрагмента сохраняются embedding и номер страницы. Поиск возвращает исходное
+имя файла и страницы, чтобы пользователь мог проверить рекомендацию.
+
+Сканированные PDF без текстового слоя требуют OCR до индексации. Руководство служит
+источником справочной информации и не заменяет действующий регламент предприятия.
+Описание использованного официального источника находится в
+[`docs/SOURCES.md`](docs/SOURCES.md). Сам PDF хранится локально и не включён в Git.
+
+## Проверка проекта
 
 ```bash
-python -m unittest test_agent_tools.py
+python -m unittest -v test_agent_tools.py
+python -m py_compile agent_tools.py database.py web_app.py
+python -m pip check
 ```
 
-Check the API:
+Тесты проверяют снимок оборудования, обработку неизвестного ID, идемпотентность
+черновика заявки и локальное одобрение.
 
-```bash
-curl http://127.0.0.1:8000/api/health
-curl http://127.0.0.1:8000/api/report
+## Структура репозитория
+
+```text
+agent_tools.py       CLI-инструменты агента
+ai_service.py        OpenAI-отчёты и структурированный ответ
+database.py          SQLite-доступ и бизнес-операции
+knowledge_service.py Индексация и поиск по PDF
+main.py              CLI импорта и отчётов
+schema.sql           Схема базы данных
+web_app.py           FastAPI API и веб-интерфейс
+static/              HTML, CSS и JavaScript dashboard
+guardrails/          Конфигурация NeMo Guardrails
+openclaw_skill/      Инструкция навыка Maintenance Copilot
+data/                Демонстрационные CSV-файлы
+docs/                Источники и проектная документация
 ```
 
-## Current scope
+## Ограничения
 
-The prototype works with uploaded CSV and PDF files and one local database. It
-does not yet connect to live sensors, a CMMS, or an ERP. PDF files must contain
-extractable text; scanned manuals require OCR before indexing.
+- проект работает с загруженными CSV/PDF и локальной SQLite-базой;
+- live-сенсоры, CMMS, ERP и автоматическая отправка заявок пока не подключены;
+- `attention` означает только превышение настроенного порога в доступных данных;
+- `normal` означает отсутствие превышения в переданных данных и не подтверждает исправность;
+- по нескольким измерениям нельзя устанавливать причину неисправности или срок отказа;
+- пороги должны быть подтверждены для конкретной модели и условий эксплуатации;
+- файлы `.env`, база данных и локальные PDF не коммитятся в репозиторий.
+
+## Безопасность
+
+Не помещайте API-ключи в исходный код, README или историю Git. Для production-сценария
+нужны аутентификация, аудит действий, управление секретами и интеграция с утверждёнными
+процедурами предприятия. Текущая реализация предназначена для локальной разработки,
+проверки идеи и безопасного прототипирования агентских workflow.
+
+## Лицензия
+
+Лицензия проекта пока не выбрана. До её добавления код следует считать доступным для
+ознакомления и личного использования в рамках условий владельца репозитория.
