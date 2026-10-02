@@ -4,3 +4,5 @@ __pycache__/
 *.pyc
 maintenance.db
 .DS_Store
+._*
+.pytest_cache/
