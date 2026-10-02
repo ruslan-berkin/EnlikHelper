@@ -114,7 +114,7 @@ python agent_tools.py approve-ticket 1
 python agent_tools.py index-manual MOTOR-01 manual.pdf
 python agent_tools.py search-manual MOTOR-01 "Что проверить при вибрации?"
 python agent_tools.py list-manuals MOTOR-01
-python agent_tools.py set-profile MOTOR-01 --manufacturer ABB --model "M2B" --serial "SERIAL-001"
+python agent_tools.py set-profile MOTOR-01 --manufacturer ABB --model "M2BAX 90SA 4" --serial "DEMO-3GBA092110-ADT"
 ```
 
 ## Verification
