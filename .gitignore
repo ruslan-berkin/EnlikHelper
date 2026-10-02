@@ -6,3 +6,4 @@ maintenance.db
 .DS_Store
 ._*
 .pytest_cache/
+data/manuals/*.pdf
