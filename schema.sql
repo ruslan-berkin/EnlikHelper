@@ -73,3 +73,42 @@ CREATE TABLE IF NOT EXISTS maintenance_tickets (
 
 CREATE INDEX IF NOT EXISTS idx_tickets_equipment_status
 ON maintenance_tickets (equipment_id, status);
+
+CREATE TABLE IF NOT EXISTS manual_documents (
+    document_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    equipment_id TEXT NOT NULL,
+    filename TEXT NOT NULL,
+    sha256 TEXT NOT NULL,
+    page_count INTEGER NOT NULL
+        CHECK (page_count > 0),
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (equipment_id)
+        REFERENCES equipment(equipment_id),
+
+    UNIQUE (equipment_id, sha256)
+);
+
+CREATE TABLE IF NOT EXISTS manual_chunks (
+    chunk_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    document_id INTEGER NOT NULL,
+    page_number INTEGER NOT NULL
+        CHECK (page_number > 0),
+    chunk_index INTEGER NOT NULL
+        CHECK (chunk_index >= 0),
+    content TEXT NOT NULL
+        CHECK (LENGTH(TRIM(content)) > 0),
+    embedding_json TEXT NOT NULL,
+
+    FOREIGN KEY (document_id)
+        REFERENCES manual_documents(document_id)
+        ON DELETE CASCADE,
+
+    UNIQUE (document_id, page_number, chunk_index)
+);
+
+CREATE INDEX IF NOT EXISTS idx_manual_documents_equipment
+ON manual_documents (equipment_id);
+
+CREATE INDEX IF NOT EXISTS idx_manual_chunks_document
+ON manual_chunks (document_id, page_number, chunk_index);

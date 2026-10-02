@@ -1,13 +1,20 @@
 import argparse
 import json
+from pathlib import Path
 
 from database import (
+    approve_maintenance_ticket,
     create_maintenance_ticket_draft,
     get_alert_readings,
     get_equipment_summaries,
     initialize_database,
+    list_manual_documents,
     list_maintenance_tickets,
-    approve_maintenance_ticket,
+)
+from knowledge_service import (
+    ManualKnowledgeUnavailable,
+    index_manual,
+    search_manual,
 )
 from main import find_alerts
 
@@ -113,7 +120,7 @@ def create_ticket_draft(equipment_id: str) -> dict:
 
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Инструменты Maintenance Copilot для AI-агента"
+        description="Инструменты EnlikHelper для AI-агента"
     )
 
     commands = parser.add_subparsers(
@@ -146,10 +153,47 @@ def create_parser() -> argparse.ArgumentParser:
         "ticket_id",
         type=int,
         help="Номер заявки",
-    ) 
+    )
     commands.add_parser(
         "list-tickets",
         help="Показать заявки на обслуживание",
+    )
+
+    index_manual_command = commands.add_parser(
+        "index-manual",
+        help="Проиндексировать PDF-инструкцию",
+    )
+    index_manual_command.add_argument(
+        "equipment_id",
+        help="Идентификатор оборудования",
+    )
+    index_manual_command.add_argument(
+        "file",
+        type=Path,
+        help="Путь к PDF-файлу",
+    )
+
+    search_manual_command = commands.add_parser(
+        "search-manual",
+        help="Найти фрагменты в инструкции",
+    )
+    search_manual_command.add_argument(
+        "equipment_id",
+        help="Идентификатор оборудования",
+    )
+    search_manual_command.add_argument(
+        "query",
+        help="Поисковый запрос",
+    )
+
+    list_manuals_command = commands.add_parser(
+        "list-manuals",
+        help="Показать загруженные инструкции",
+    )
+    list_manuals_command.add_argument(
+        "equipment_id",
+        nargs="?",
+        help="Необязательный идентификатор оборудования",
     )
 
     return parser
@@ -183,6 +227,34 @@ def main() -> None:
                 "tickets": list_maintenance_tickets()
             }
 
+        elif arguments.command == "index-manual":
+            if arguments.file.suffix.lower() != ".pdf":
+                raise ValueError("Инструкция должна быть PDF-файлом")
+
+            if not arguments.file.is_file():
+                raise ValueError(
+                    f"Файл не найден: {arguments.file}"
+                )
+
+            result = index_manual(
+                equipment_id=arguments.equipment_id,
+                file_path=arguments.file,
+                filename=arguments.file.name,
+            )
+
+        elif arguments.command == "search-manual":
+            result = search_manual(
+                equipment_id=arguments.equipment_id,
+                query=arguments.query,
+            )
+
+        elif arguments.command == "list-manuals":
+            result = {
+                "documents": list_manual_documents(
+                    arguments.equipment_id
+                )
+            }
+
         else:
             raise ValueError(
                 f"Неизвестная команда: {arguments.command}"
@@ -196,7 +268,7 @@ def main() -> None:
             )
         )
 
-    except ValueError as error:
+    except (ValueError, ManualKnowledgeUnavailable) as error:
         print(
             json.dumps(
                 {"error": str(error)},

@@ -4,15 +4,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Maintenance Copilot</title>
-  <link rel="stylesheet" href="/static/styles.css">
+  <title>EnlikHelper</title>
+  <link rel="stylesheet" href="/static/styles.css?v=2">
 </head>
 
 <body>
   <header class="topbar">
     <div>
       <p class="eyebrow">Мониторинг оборудования</p>
-      <h1>Maintenance Copilot</h1>
+      <h1>EnlikHelper</h1>
     </div>
 
     <div class="status">
@@ -89,6 +89,63 @@
       </div>
     </section>
 
+    <section class="manual-panel">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">OpenAI Embeddings</p>
+          <h2>База инструкций</h2>
+        </div>
+      </div>
+
+      <p class="manual-note">
+        Загрузите PDF для конкретного оборудования. EnlikHelper найдёт
+        подходящие фрагменты и покажет источник с номером страницы.
+      </p>
+
+      <div class="manual-controls">
+        <form id="manual-upload-form" class="manual-form">
+          <label>
+            Оборудование
+            <select id="manual-equipment" required></select>
+          </label>
+
+          <label class="manual-file-label">
+            PDF-инструкция
+            <input id="manual-file" name="file" type="file"
+              accept=".pdf,application/pdf" required>
+          </label>
+
+          <button type="submit">Добавить инструкцию</button>
+        </form>
+
+        <p id="manual-upload-message" class="message" aria-live="polite"></p>
+
+        <form id="manual-search-form" class="manual-search-form">
+          <label>
+            Вопрос по инструкции
+            <input id="manual-query" type="search"
+              placeholder="Например: что проверить при высокой вибрации?"
+              required>
+          </label>
+          <button type="submit">Найти в инструкции</button>
+        </form>
+      </div>
+
+      <div class="manual-columns">
+        <div>
+          <h3>Загруженные документы</h3>
+          <div id="manuals-list" class="manuals-list"></div>
+        </div>
+
+        <div>
+          <h3>Найденные фрагменты</h3>
+          <div id="manual-results" class="manual-results">
+            <div class="empty">Задайте вопрос по инструкции.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section>
       <div class="section-heading">
         <div>
@@ -106,7 +163,7 @@
     </section>
   </main>
 
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v=2"></script>
 </body>
 
 </html>

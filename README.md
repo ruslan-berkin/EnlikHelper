@@ -1,13 +1,14 @@
-# Maintenance Copilot
+# EnlikHelper
 
-Maintenance Copilot is an industrial monitoring prototype that turns sensor
+EnlikHelper is an industrial maintenance agent that turns sensor
 readings into traceable maintenance actions. It combines deterministic Python
 and SQL calculations with an OpenAI-powered agent running in an NVIDIA
 NemoClaw sandbox.
 
 The agent can inspect equipment state, explain threshold violations, create a
-maintenance-ticket draft, avoid duplicate tickets, and approve a draft only
-after an explicit user request.
+maintenance-ticket draft, avoid duplicate tickets, approve a draft only after
+an explicit user request, and retrieve relevant procedures from indexed PDF
+manuals with page citations.
 
 ## Why this is an agent
 
@@ -22,6 +23,10 @@ Current tools:
   latest alert;
 - `list-tickets` — list maintenance tickets;
 - `approve-ticket <ticket_id>` — approve a draft after explicit confirmation.
+- `index-manual <equipment_id> <file.pdf>` — extract and index a PDF manual;
+- `search-manual <equipment_id> <query>` — retrieve relevant manual fragments
+  with filename and page citations;
+- `list-manuals [equipment_id]` — list indexed manuals.
 
 ## Architecture
 
@@ -32,7 +37,7 @@ CSV sensor readings
 Python validation and calculations
         |
         v
-SQLite: equipment, thresholds, readings, tickets
+SQLite: equipment, thresholds, readings, tickets, manual chunks
         |
         +--------------------+
         |                    |
@@ -46,10 +51,10 @@ FastAPI dashboard      NVIDIA NemoClaw sandbox
                     Registered Python tools
 ```
 
-OpenAI handles intent recognition, tool selection, and user-facing
-explanations. NVIDIA NemoClaw provides the isolated agent runtime. NVIDIA NeMo
-Guardrails checks generated analytical reports before they are shown in the
-dashboard.
+OpenAI handles intent recognition, tool selection, user-facing explanations,
+and embeddings for semantic search over equipment manuals. NVIDIA NemoClaw
+provides the isolated, always-on agent runtime. NVIDIA NeMo Guardrails checks
+generated analytical reports before they are shown in the dashboard.
 
 ## Safety and traceability
 
@@ -62,6 +67,8 @@ dashboard.
 - Approval changes only the local ticket status and does not send anything to
   an external maintenance system.
 - AI output is an operational aid, not an equipment diagnosis.
+- Manual guidance is grounded in retrieved PDF fragments and includes the
+  filename and page number.
 
 ## Local setup
 
@@ -74,8 +81,8 @@ python -m pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Add an OpenAI API key to `.env` if you want to use AI reports. Never commit the
-`.env` file.
+Add an OpenAI API key to `.env` to use AI reports and manual search. Never
+commit the `.env` file.
 
 Import the sample data and configure the second motor:
 
@@ -100,6 +107,9 @@ python agent_tools.py snapshot MOTOR-01
 python agent_tools.py create-ticket-draft MOTOR-01
 python agent_tools.py list-tickets
 python agent_tools.py approve-ticket 1
+python agent_tools.py index-manual MOTOR-01 manual.pdf
+python agent_tools.py search-manual MOTOR-01 "Что проверить при вибрации?"
+python agent_tools.py list-manuals MOTOR-01
 ```
 
 ## Verification
@@ -119,7 +129,6 @@ curl http://127.0.0.1:8000/api/report
 
 ## Current scope
 
-The prototype works with uploaded CSV files and one local database. It does not
-yet connect to live sensors, a CMMS, or an ERP. Maintenance recommendations
-remain generic until equipment manuals are indexed and returned with source
-citations.
+The prototype works with uploaded CSV and PDF files and one local database. It
+does not yet connect to live sensors, a CMMS, or an ERP. PDF files must contain
+extractable text; scanned manuals require OCR before indexing.

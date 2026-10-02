@@ -9,6 +9,12 @@ const aiReportButton = document.querySelector("#ai-report-button");
 const aiReportContainer = document.querySelector("#ai-report");
 const ticketsList = document.querySelector("#tickets-list");
 const ticketsCount = document.querySelector("#tickets-count");
+const manualEquipment = document.querySelector("#manual-equipment");
+const manualUploadForm = document.querySelector("#manual-upload-form");
+const manualUploadMessage = document.querySelector("#manual-upload-message");
+const manualSearchForm = document.querySelector("#manual-search-form");
+const manualsList = document.querySelector("#manuals-list");
+const manualResults = document.querySelector("#manual-results");
 
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (character) => ({
@@ -185,6 +191,62 @@ function renderTickets(items) {
   `).join("");
 }
 
+function renderManuals(items) {
+  if (items.length === 0) {
+    manualsList.innerHTML =
+      '<div class="empty">Для этого оборудования пока нет инструкций.</div>';
+    return;
+  }
+
+  manualsList.innerHTML = items.map((document) => `
+    <article class="manual-document">
+      <strong>${escapeHtml(document.filename)}</strong>
+      <span>${document.page_count} стр. · ${document.chunks_count} фрагм.</span>
+    </article>
+  `).join("");
+}
+
+function renderManualMatches(matches) {
+  if (matches.length === 0) {
+    manualResults.innerHTML =
+      '<div class="empty">Подходящих фрагментов не найдено.</div>';
+    return;
+  }
+
+  manualResults.innerHTML = matches.map((match) => `
+    <article class="manual-match">
+      <div class="manual-citation">${escapeHtml(match.citation)}</div>
+      <p>${escapeHtml(match.content)}</p>
+      <span>Сходство: ${Math.round(match.score * 100)}%</span>
+    </article>
+  `).join("");
+}
+
+async function loadManuals() {
+  const equipmentId = manualEquipment.value;
+
+  if (!equipmentId) {
+    renderManuals([]);
+    return;
+  }
+
+  try {
+    const response = await fetch(
+      `/api/manuals?equipment_id=${encodeURIComponent(equipmentId)}`
+    );
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.detail || "Не удалось загрузить инструкции");
+    }
+
+    renderManuals(result.documents);
+  } catch (error) {
+    manualsList.innerHTML =
+      `<div class="empty">${escapeHtml(error.message)}</div>`;
+  }
+}
+
 async function loadReport() {
   refreshButton.disabled = true;
 
@@ -204,6 +266,21 @@ async function loadReport() {
     renderEquipment(report.equipment);
     renderAlerts(report.alerts);
     renderTickets(report.tickets);
+
+    const previousEquipment = manualEquipment.value;
+    manualEquipment.innerHTML = report.equipment.map((item) => `
+      <option value="${escapeHtml(item.equipment_id)}">
+        ${escapeHtml(item.equipment_id)}
+      </option>
+    `).join("");
+
+    if (report.equipment.some(
+      (item) => item.equipment_id === previousEquipment
+    )) {
+      manualEquipment.value = previousEquipment;
+    }
+
+    await loadManuals();
   } catch (error) {
     equipmentGrid.innerHTML =
       `<div class="empty">${escapeHtml(error.message)}</div>`;
@@ -287,6 +364,93 @@ uploadForm.addEventListener("submit", async (event) => {
   } catch (error) {
     uploadMessage.className = "message error";
     uploadMessage.textContent = error.message;
+  } finally {
+    submitButton.disabled = false;
+  }
+});
+
+manualEquipment.addEventListener("change", async () => {
+  manualResults.innerHTML =
+    '<div class="empty">Задайте вопрос по инструкции.</div>';
+  await loadManuals();
+});
+
+manualUploadForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+
+  const file = document.querySelector("#manual-file").files[0];
+  const equipmentId = manualEquipment.value;
+
+  if (!file || !equipmentId) {
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append("file", file);
+  const submitButton = manualUploadForm.querySelector("button");
+  submitButton.disabled = true;
+  manualUploadMessage.className = "message";
+  manualUploadMessage.textContent = "Извлекаем текст и создаём индекс…";
+
+  try {
+    const response = await fetch(
+      `/api/manuals/${encodeURIComponent(equipmentId)}/import`,
+      { method: "POST", body: formData }
+    );
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.detail || "Не удалось добавить инструкцию");
+    }
+
+    manualUploadMessage.className = "message success";
+    manualUploadMessage.textContent = result.created
+      ? `Добавлено: ${result.document.filename}.`
+      : "Эта инструкция уже была загружена.";
+    manualUploadForm.reset();
+    await loadManuals();
+  } catch (error) {
+    manualUploadMessage.className = "message error";
+    manualUploadMessage.textContent = error.message;
+  } finally {
+    submitButton.disabled = false;
+  }
+});
+
+manualSearchForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+
+  const query = document.querySelector("#manual-query").value.trim();
+  const equipmentId = manualEquipment.value;
+
+  if (!query || !equipmentId) {
+    return;
+  }
+
+  const submitButton = manualSearchForm.querySelector("button");
+  submitButton.disabled = true;
+  manualResults.innerHTML =
+    '<div class="empty">Ищем подходящие страницы…</div>';
+
+  try {
+    const response = await fetch(
+      `/api/manuals/${encodeURIComponent(equipmentId)}/search`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query }),
+      }
+    );
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.detail || "Не удалось выполнить поиск");
+    }
+
+    renderManualMatches(result.matches);
+  } catch (error) {
+    manualResults.innerHTML =
+      `<div class="empty">${escapeHtml(error.message)}</div>`;
   } finally {
     submitButton.disabled = false;
   }
